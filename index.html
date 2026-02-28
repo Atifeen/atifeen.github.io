@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A* Pathfinding - Road Network Visualization</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: white;
+        }
+
+        #header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        #header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        #header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+
+        #map {
+            flex: 1;
+        }
+
+        #sidebar {
+            width: 350px;
+            background: #2d2d2d;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.3);
+        }
+
+        .info-box {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #4a4a4a;
+        }
+
+        .info-box h3 {
+            font-size: 14px;
+            color: #667eea;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #4a4a4a;
+            font-size: 13px;
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #aaa;
+        }
+
+        .info-value {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
+        #log {
+            background: #1a1a1a;
+            padding: 12px;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            border: 1px solid #4a4a4a;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+        }
+
+        .log-time {
+            color: #90cdf4;
+        }
+
+        .log-success {
+            color: #68d391;
+        }
+
+        .log-error {
+            color: #fc8181;
+        }
+
+        .log-info {
+            color: #fbd38d;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .status-ready {
+            background: #48bb78;
+            color: white;
+        }
+
+        .status-waiting {
+            background: #ed8936;
+            color: white;
+        }
+
+        .instructions {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 15px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .instructions strong {
+            color: #667eea;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #3a3a3a;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .checkbox-container label {
+            cursor: pointer;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div id="map"></div>
+        <div id="sidebar">
+            <div class="instructions">
+                <strong>How to use:</strong><br>
+                1. Click <strong>first point</strong> (start) - appears as red marker<br>
+                2. Click <strong>second point</strong> (end) - appears as blue marker<br>
+                3. A* algorithm will calculate path and show result
+            </div>
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="showNodes" onchange="toggleNodes()">
+                <label for="showNodes">Show all graph nodes</label>
+            </div>
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="showEdges" onchange="toggleEdges()">
+                <label for="showEdges">Show all graph edges</label>
+            </div>
+
+            <button class="btn-primary" onclick="clearPoints()">🗑️ Clear All Points</button>
+            <button class="btn-danger" onclick="resetMap()">🔄 Reset Map</button>
+
+            <div class="info-box">
+                <h3>📊 Graph Statistics</h3>
+                <div class="info-item">
+                    <span class="info-label">Total Nodes</span>
+                    <span class="info-value" id="nodeCount">0</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Total Edges</span>
+                    <span class="info-value" id="edgeCount">0</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Graph Type</span>
+                    <span class="info-value" id="graphType">Loading...</span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>🎯 Selection Status</h3>
+                <div class="info-item">
+                    <span class="info-label">Start Point</span>
+                    <span class="info-value" id="startStatus">Not selected</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Start Neighbors</span>
+                    <span class="info-value" id="startNeighbors">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">End Point</span>
+                    <span class="info-value" id="endStatus">Not selected</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">End Neighbors</span>
+                    <span class="info-value" id="endNeighbors">-</span>
+                </div>
+            </div>
+
+            <div class="info-box" id="resultBox" style="display: none;">
+                <h3>✨ Path Result</h3>
+                <div class="info-item">
+                    <span class="info-label">Path Found</span>
+                    <span class="info-value" id="pathFound">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Path Length</span>
+                    <span class="info-value" id="pathLength">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Distance</span>
+                    <span class="info-value" id="pathDistance">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Nodes Explored</span>
+                    <span class="info-value" id="nodesExplored">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Computation Time</span>
+                    <span class="info-value" id="computeTime">-</span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>📝 Activity Log</h3>
+                <div id="log"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="astar.js"></script>
+    <script>
+        // ==================== GLOBAL STATE ====================
+        let map;
+        let roadNetwork = { nodes: [], edges: [], nodeMap: {} };
+        let startPoint = null;
+        let endPoint = null;
+        let startMarker = null;
+        let endMarker = null;
+        let pathLine = null;
+        let nodeLayer = null;
+        let edgeLayer = null;
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([22.8456, 89.5403], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                maxZoom: 19
+            }).addTo(map);
+
+            map.on('click', handleMapClick);
+            
+            logMessage('Map initialized. Click to select points!', 'success');
+        }
+
+        // Load road network data
+        async function loadRoadNetwork() {
+            try {
+                logMessage('Loading road network...', 'info');
+                const response = await fetch('khulna.json');
+                const geojson = await response.json();
+                
+                logMessage(`Loaded ${geojson.features.length} features from khulna.json`, 'info');
+                
+                buildGraphFromGeoJSON(geojson);
+                displayRoadNetwork(geojson);
+                renderFullGraph();
+                
+                logMessage(`Graph built: ${roadNetwork.nodes.length} nodes, ${roadNetwork.edges.length} edges`, 'success');
+                updateStats();
+                
+            } catch (error) {
+                logMessage('⚠️ Could not load khulna.json, trying khulna_simplified.json...', 'info');
+                
+                try {
+                    const response = await fetch('khulna_simplified.json');
+                    const geojson = await response.json();
+                    
+                    logMessage(`Loaded ${geojson.features.length} features from khulna_simplified.json`, 'info');
+                    buildGraphFromGeoJSON(geojson);
+                    displayRoadNetwork(geojson);
+                    renderFullGraph();
+                    updateStats();
+                    
+                } catch (error2) {
+                    logMessage('❌ Could not load GeoJSON files', 'error');
+                }
+            }
+        }
+
+        // Build graph from GeoJSON
+        function buildGraphFromGeoJSON(geojson) {
+            console.log('🏗️ Building graph from GeoJSON...');
+            
+            const nodeMap = new Map();
+            const edges = [];
+            let nodeIdCounter = 0;
+
+            function getNodeId(lat, lon) {
+                const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+                if (!nodeMap.has(key)) {
+                    nodeMap.set(key, {
+                        id: nodeIdCounter++,
+                        lat: lat,
+                        lon: lon,
+                        neighbors: []
+                    });
+                }
+                return nodeMap.get(key).id;
+            }
+
+            let lineStringCount = 0;
+            let edgeCount = 0;
+            
+            geojson.features.forEach(feature => {
+                if (feature.geometry.type === 'LineString') {
+                    lineStringCount++;
+                    const coords = feature.geometry.coordinates;
+                    
+                    for (let i = 0; i < coords.length - 1; i++) {
+                        const [lon1, lat1] = coords[i];
+                        const [lon2, lat2] = coords[i + 1];
+                        
+                        const nodeId1 = getNodeId(lat1, lon1);
+                        const nodeId2 = getNodeId(lat2, lon2);
+                        
+                        const distance = haversineDistance(lat1, lon1, lat2, lon2);
+                        
+                        edges.push({
+                            from: nodeId1,
+                            to: nodeId2,
+                            distance: distance
+                        });
+
+                        edges.push({
+                            from: nodeId2,
+                            to: nodeId1,
+                            distance: distance
+                        });
+                        
+                        edgeCount += 2;
+                    }
+                }
+            });
+
+            roadNetwork.nodes = Array.from(nodeMap.values());
+            roadNetwork.edges = edges;
+            roadNetwork.nodeMap = nodeMap;
+
+            console.log(`Created ${roadNetwork.nodes.length} nodes from ${lineStringCount} LineStrings`);
+            console.log(`Created ${edgeCount} directed edges`);
+
+            // Build adjacency list
+            roadNetwork.nodes.forEach(node => node.neighbors = []);
+            edges.forEach(edge => {
+                roadNetwork.nodes[edge.from].neighbors.push({
+                    nodeId: edge.to,
+                    distance: edge.distance
+                });
+            });
+
+            console.log('✅ Adjacency list built');
+            console.log('Sample nodes:', roadNetwork.nodes.slice(0, 3));
+            
+            logMessage(`Processed ${lineStringCount} road segments`, 'info');
+        }
+
+        // Display road network on map
+        function displayRoadNetwork(geojson) {
+            L.geoJSON(geojson, {
+                style: (feature) => {
+                    if (feature.geometry.type === 'LineString') {
+                        return {
+                            color: '#555',
+                            weight: 2,
+                            opacity: 0.5
+                        };
+                    }
+                    return {};
+                },
+                filter: (feature) => {
+                    return feature.geometry.type === 'LineString';
+                }
+            }).addTo(map);
+        }
+
+        // Render graph nodes and edges
+        function renderFullGraph() {
+            logMessage('Rendering full graph visualization...', 'info');
+            
+            // Render edges
+            const edgeLines = [];
+            const edgeSet = new Set();
+            
+            roadNetwork.edges.forEach(edge => {
+                const edgeKey = edge.from < edge.to ? `${edge.from}-${edge.to}` : `${edge.to}-${edge.from}`;
+                if (!edgeSet.has(edgeKey)) {
+                    edgeSet.add(edgeKey);
+                    const node1 = roadNetwork.nodes[edge.from];
+                    const node2 = roadNetwork.nodes[edge.to];
+                    edgeLines.push([[node1.lat, node1.lon], [node2.lat, node2.lon]]);
+                }
+            });
+            
+            edgeLayer = L.layerGroup();
+            edgeLines.forEach(coords => {
+                L.polyline(coords, {
+                    color: '#ff6b6b',
+                    weight: 1,
+                    opacity: 0.4
+                }).addTo(edgeLayer);
+            });
+            // Don't add to map initially - controlled by checkbox
+            
+            logMessage(`Rendered ${edgeLines.length} edges`, 'success');
+            
+            // Render nodes
+            nodeLayer = L.layerGroup();
+            roadNetwork.nodes.forEach(node => {
+                L.circleMarker([node.lat, node.lon], {
+                    radius: 2,
+                    fillColor: '#4ecdc4',
+                    color: '#4ecdc4',
+                    weight: 1,
+                    opacity: 0.8,
+                    fillOpacity: 0.6
+                }).addTo(nodeLayer);
+            });
+            // Don't add to map initially - controlled by checkbox
+            
+            logMessage(`Rendered ${roadNetwork.nodes.length} nodes`, 'success');
+        }
+
+        // Toggle node visibility
+        function toggleNodes() {
+            const checkbox = document.getElementById('showNodes');
+            if (checkbox.checked && nodeLayer) {
+                map.addLayer(nodeLayer);
+                logMessage('Nodes shown', 'info');
+            } else if (nodeLayer) {
+                map.removeLayer(nodeLayer);
+                logMessage('Nodes hidden', 'info');
+            }
+        }
+
+        function toggleEdges() {
+            const checkbox = document.getElementById('showEdges');
+            if (checkbox.checked && edgeLayer) {
+                map.addLayer(edgeLayer);
+                logMessage('Edges shown', 'info');
+            } else if (edgeLayer) {
+                map.removeLayer(edgeLayer);
+                logMessage('Edges hidden', 'info');
+            }
+        }
+
+        // Handle map click to select start/end points
+        function handleMapClick(e) {
+            const lat = e.latlng.lat;
+            const lon = e.latlng.lng;
+
+            if (!startPoint) {
+                // Set start point
+                const nearestNode = snapToNearestRoad(lat, lon);
+                startPoint = nearestNode;
+                
+                startMarker = L.circleMarker([nearestNode.lat, nearestNode.lon], {
+                    radius: 10,
+                    fillColor: '#ff4444',
+                    color: '#fff',
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                
+                startMarker.bindPopup(`<b>🚩 Start Point</b><br>Node ID: ${nearestNode.id}<br>Neighbors: ${nearestNode.neighbors.length}`).openPopup();
+                
+                document.getElementById('startStatus').textContent = `Node ${nearestNode.id}`;
+                document.getElementById('startNeighbors').textContent = nearestNode.neighbors.length;
+                logMessage(`Start point set: Node ${nearestNode.id} [${nearestNode.lat.toFixed(5)}, ${nearestNode.lon.toFixed(5)}] with ${nearestNode.neighbors.length} neighbors`, 'success');
+                
+            } else if (!endPoint) {
+                // Set end point
+                const nearestNode = snapToNearestRoad(lat, lon);
+                endPoint = nearestNode;
+                
+                endMarker = L.circleMarker([nearestNode.lat, nearestNode.lon], {
+                    radius: 10,
+                    fillColor: '#4444ff',
+                    color: '#fff',
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                
+                endMarker.bindPopup(`<b>🎯 End Point</b><br>Node ID: ${nearestNode.id}<br>Neighbors: ${nearestNode.neighbors.length}`).openPopup();
+                
+                document.getElementById('endStatus').textContent = `Node ${nearestNode.id}`;
+                document.getElementById('endNeighbors').textContent = nearestNode.neighbors.length;
+                logMessage(`End point set: Node ${nearestNode.id} [${nearestNode.lat.toFixed(5)}, ${nearestNode.lon.toFixed(5)}] with ${nearestNode.neighbors.length} neighbors`, 'success');
+                
+                // Calculate path
+                calculatePath();
+            } else {
+                // Reset and start over
+                clearPoints();
+                handleMapClick(e);
+            }
+        }
+
+        // Calculate shortest path between two points
+        function calculatePath() {
+            if (!startPoint || !endPoint) return;
+            
+            document.getElementById('startNeighbors').textContent = startPoint.neighbors.length;
+            document.getElementById('endNeighbors').textContent = endPoint.neighbors.length;
+            
+            logMessage('Running A* algorithm...', 'info');
+            
+            const result = aStarPathfinding(startPoint.id, endPoint.id, roadNetwork);
+            
+            document.getElementById('resultBox').style.display = 'block';
+            document.getElementById('nodesExplored').textContent = result.nodesExplored;
+            document.getElementById('computeTime').textContent = result.time.toFixed(2) + ' ms';
+            
+            if (result.path && result.path.length > 0) {
+                // Path found!
+                logMessage(`✅ Path found! ${result.path.length} nodes, ${result.distance.toFixed(0)}m`, 'success');
+                
+                document.getElementById('pathFound').textContent = '✅ Yes';
+                document.getElementById('pathLength').textContent = result.path.length + ' nodes';
+                document.getElementById('pathDistance').textContent = result.distance.toFixed(0) + ' m';
+                
+                // Draw path
+                const pathCoords = result.path.map(nodeId => {
+                    const node = roadNetwork.nodes[nodeId];
+                    return [node.lat, node.lon];
+                });
+                
+                if (pathLine) {
+                    map.removeLayer(pathLine);
+                }
+                
+                pathLine = L.polyline(pathCoords, {
+                    color: '#00ff00',
+                    weight: 5,
+                    opacity: 0.9
+                }).addTo(map);
+                
+                pathLine.bringToFront();
+                
+                // Keep current zoom level - don't auto-zoom to path
+                // map.fitBounds(pathLine.getBounds(), { padding: [50, 50] });
+                
+            } else {
+                // No path found
+                logMessage(`❌ No path found! Nodes may not be connected`, 'error');
+                
+                document.getElementById('pathFound').textContent = '❌ No';
+                document.getElementById('pathLength').textContent = '-';
+                document.getElementById('pathDistance').textContent = '-';
+                
+                // Draw direct line to show why it failed
+                if (pathLine) {
+                    map.removeLayer(pathLine);
+                }
+                
+                pathLine = L.polyline([
+                    [startPoint.lat, startPoint.lon],
+                    [endPoint.lat, endPoint.lon]
+                ], {
+                    color: '#ff0000',
+                    weight: 3,
+                    opacity: 0.7,
+                    dashArray: '10, 10'
+                }).addTo(map);
+            }
+        }
+
+        // Clear all markers and reset selection
+        function clearPoints() {
+            if (startMarker) map.removeLayer(startMarker);
+            if (endMarker) map.removeLayer(endMarker);
+            if (pathLine) map.removeLayer(pathLine);
+            
+            startPoint = null;
+            endPoint = null;
+            startMarker = null;
+            endMarker = null;
+            pathLine = null;
+            
+            document.getElementById('startStatus').textContent = 'Not selected';
+            document.getElementById('startNeighbors').textContent = '-';
+            document.getElementById('endStatus').textContent = 'Not selected';
+            document.getElementById('endNeighbors').textContent = '-';
+            document.getElementById('resultBox').style.display = 'none';
+            
+            logMessage('Points cleared. Click to select new points.', 'info');
+        }
+
+        // Reset map view to initial state
+        function resetMap() {
+            clearPoints();
+            map.setView([22.8456, 89.5403], 13);
+            logMessage('Map reset', 'info');
+        }
+
+        // Find nearest node to clicked location
+
+        function snapToNearestRoad(lat, lon) {
+            let nearestNode = null;
+            let minDistance = Infinity;
+            
+            roadNetwork.nodes.forEach(node => {
+                const dist = haversineDistance(lat, lon, node.lat, node.lon);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestNode = node;
+                }
+            });
+            
+            return nearestNode;
+        }
+
+        function updateStats() {
+            document.getElementById('nodeCount').textContent = roadNetwork.nodes.length;
+            document.getElementById('edgeCount').textContent = roadNetwork.edges.length;
+            document.getElementById('graphType').textContent = 'Bidirectional';
+        }
+
+        function logMessage(message, type = 'info') {
+            const log = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            let className = 'log-info';
+            if (type === 'success') className = 'log-success';
+            if (type === 'error') className = 'log-error';
+            
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${className}">${message}</span>`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // ==================== INITIALIZE ====================
+        window.onload = async function() {
+            initMap();
+            await loadRoadNetwork();
+            
+            // Show instructions to user
+            alert('📍 How to use:\n\n1. Click first point (start) - appears as red marker\n2. Click second point (end) - appears as blue marker\n3. A* algorithm will calculate path and show result\n\n✨ The system will automatically find the shortest route!');
+        };
+    </script>
+</body>
+</html>
