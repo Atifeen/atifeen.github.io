@@ -6,10 +6,9 @@ An interactive web application demonstrating the A* pathfinding algorithm on rea
 
 **GitHub Pages (Easiest - No Setup Required)**
 
-This project is hosted on GitHub Pages. Visit the live demo at:
-```
-https://[your-username].github.io/[repository-name]/
-```
+🌐 **Live Site**: [https://atifeen.github.io/](https://atifeen.github.io/)
+
+The project is hosted on GitHub Pages - click the link above to see it in action!
 
 **Local Development**
 
